@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import Intents
 from dotenv import load_dotenv
 from language_model import query_model
+from time import time
 
 # Load discord token for bot from .env file
 load_dotenv()
@@ -22,7 +23,10 @@ async def on_ready():
 @client.command()
 async def ask(ctx, *args):
     query = " ".join(args)
+    start = time()
     response = query_model(query)
+    end = time()
+    response += f"\nTime Taken: {end - start}"
     await ctx.send(response)
 
 
