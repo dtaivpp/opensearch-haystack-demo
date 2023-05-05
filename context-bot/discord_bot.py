@@ -3,12 +3,11 @@ from discord.ext import commands
 from discord import Intents
 from dotenv import load_dotenv
 from language_model import query_model
-#from server import DiscordServer
 
-connected_guilds = {}
-
+# Load discord token for bot from .env file
 load_dotenv()
 discord_token = os.getenv('DISCORD_TOKEN')
+
 intents = Intents.default()
 intents.message_content = True
 

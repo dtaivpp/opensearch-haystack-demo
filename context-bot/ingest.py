@@ -1,13 +1,19 @@
 import json
 from util import build_doc_store
 from haystack.nodes import PreProcessor
+from os import listdir
+from os.path import isfile, join
 
 import urllib3
 urllib3.disable_warnings()
 
-def read_json(filename="data/opensearch-docs-and-blogs.json"):
-    with open(filename, 'r') as f:
-        data = json.load(f)
+def read_json(basepath="data"):
+    files = [join(basepath, f) for f in listdir(basepath) if isfile(join(basepath, f))]
+    data = []
+    for file in files:
+        print(f"Ingesting: {file}")
+        with open(file, 'r') as f:
+            data.extend(json.load(f))
     return data
 
 
@@ -39,7 +45,7 @@ def preprocessor_builder():
 
 
 def ingest_docs(docs):
-    docstore = build_doc_store('1028')
+    docstore = build_doc_store()
     docstore.write_documents(docs)
 
 
