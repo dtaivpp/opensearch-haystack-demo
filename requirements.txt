@@ -1,0 +1,3 @@
+farm-haystack[opensearch,crawler,pdf,preprocessing,ray]
+discord.py
+python-dotenv
