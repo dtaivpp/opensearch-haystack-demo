@@ -5,10 +5,6 @@ from haystack.nodes import TransformersSummarizer
 from util import build_doc_store
 from time import time
 
-import logging
-
-logging.basicConfig(format="%(levelname)s - %(name)s -  %(message)s", level=logging.WARNING)
-logger =logging.getLogger("haystack").setLevel(logging.INFO)
 
 def query_model(query):
     lfqa_prompt = PromptTemplate(
@@ -21,12 +17,12 @@ def query_model(query):
 
     document_store=build_doc_store()
     retriever = BM25Retriever(document_store=document_store, top_k=2)
-    prompt_node = PromptNode(model_name_or_path="google/flan-t5-xl", default_prompt_template=lfqa_prompt, model_kwargs={"model_max_length" : 1536})
+    prompt_node = PromptNode(model_name_or_path="google/flan-t5-xl", use_gpu=False ,default_prompt_template=lfqa_prompt, model_kwargs={"model_max_length" : 1536})
     #summarizer = TransformersSummarizer(model_name_or_path="google/pegasus-xsum")
 
     docs=retriever.retrieve(query=query)
     for doc in docs: 
-        logger.info(doc['content'])
+        print("\nContext: " + doc.content + "\n")
     #summary = summarizer.predict(documents=docs)
     #small_docs = [Document(content=doc.meta["summary"]) for doc in summary]
     output = prompt_node(query=query, documents=docs, debug=False)
