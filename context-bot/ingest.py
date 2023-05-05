@@ -39,8 +39,8 @@ def preprocessor_builder():
         clean_empty_lines=True, 
         split_by='word',
         split_respect_sentence_boundary=True,
-        split_length=300,
-        split_overlap=20
+        split_length=250,
+        split_overlap=30
     )
 
 

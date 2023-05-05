@@ -3,6 +3,7 @@ from haystack import Pipeline, Document
 from haystack.nodes import PromptNode, PromptTemplate
 from haystack.nodes import TransformersSummarizer
 from util import build_doc_store
+from time import time
 
 
 def query_model(query):
@@ -15,10 +16,11 @@ def query_model(query):
     )
 
     document_store=build_doc_store()
-    retriever = BM25Retriever(document_store=document_store)
-    prompt_node = PromptNode(model_name_or_path="google/flan-t5-large", default_prompt_template=lfqa_prompt, model_kwargs={"model_max_length" : 1024})
+    retriever = BM25Retriever(document_store=document_store, top_k=2)
+    prompt_node = PromptNode(model_name_or_path="google/flan-t5-xl", default_prompt_template=lfqa_prompt, model_kwargs={"model_max_length" : 1536})
+    #summarizer = TransformersSummarizer(model_name_or_path="google/pegasus-xsum")
 
-    docs =retriever.retrieve(query=query)
+    docs=retriever.retrieve(query=query)
     #summary = summarizer.predict(documents=docs)
     #small_docs = [Document(content=doc.meta["summary"]) for doc in summary]
     output = prompt_node(query=query, documents=docs, debug=False)
@@ -27,4 +29,7 @@ def query_model(query):
 
 if __name__=="__main__":
     query = "How do I enable segment replication"
+    start = time()
     print(f"\n\nResults: \n{query_model(query)}")
+    end = time()
+    print(f"Time Taken: {end - start}")
