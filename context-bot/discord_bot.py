@@ -34,7 +34,7 @@ async def flan(ctx, *args):
 async def gpt(ctx, *args):
     query = " ".join(args)
     start = time()
-    response = query_model(query)
+    response = query_model(query, model_name="gpt-3.5-turbo")
     end = time()
     response += f"\nTime Taken: {end - start}"
     await ctx.send(response)
