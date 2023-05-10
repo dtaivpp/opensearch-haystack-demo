@@ -33,7 +33,7 @@ def query_model(query, model_name="google/flan-t5-large"):
 
     output = pipeline.run(query=query)
 
-    return output[0]
+    return output['results'][0]
 
 if __name__=="__main__":
     query = "How do I enable segment replication"
