@@ -21,7 +21,17 @@ async def on_ready():
 
 
 @client.command()
-async def ask(ctx, *args):
+async def flan(ctx, *args):
+    query = " ".join(args)
+    start = time()
+    response = query_model(query)
+    end = time()
+    response += f"\nTime Taken: {end - start}"
+    await ctx.send(response)
+
+
+@client.command()
+async def gpt(ctx, *args):
     query = " ".join(args)
     start = time()
     response = query_model(query)

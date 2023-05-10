@@ -18,4 +18,3 @@ def build_doc_store() -> OpenSearchDocumentStore:
   return OpenSearchDocumentStore(
       **_opensearch_kwargs()
     )
-
