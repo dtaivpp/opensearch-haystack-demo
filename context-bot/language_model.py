@@ -11,21 +11,21 @@ openai_api_key = os.getenv('OPEN_API_KEY')
 
 def query_model(query, model_name="google/flan-t5-large"):
     lfqa_prompt = PromptTemplate(
-        name="lfqa",
-        prompt_text="""Synthesize a comprehensive answer from the following text for the given question. 
-                                Provide a clear and concise response that summarizes the key points and information presented in the text. 
-                                Your answer should be in your own words and be no longer than 50 words. 
-                                \n\n Related text: {join(documents)} \n\n Question: {query} \n\n Answer:""",
+        """Synthesize a comprehensive answer from the following text for the given question. 
+        Provide a clear and concise response that summarizes the 
+        key points and information presented in the text. 
+        Your answer should be in your own words.
+        \n\n Related text: {join(documents)} \n\n Question: {query} \n\n Answer:""",
     )
 
-    document_store=build_doc_store()
-    retriever = BM25Retriever(document_store=document_store, top_k=4)
-    
+    document_store=build_doc_store()    
     if model_name=="gpt-3.5-turbo":
-        prompt_open_ai = PromptModel(model_name_or_path="gpt-3.5-turbo", api_key=openai_api_key)
+        retriever = BM25Retriever(document_store=document_store, top_k=5)
+        prompt_open_ai = PromptModel(model_name_or_path="gpt-3.5-turbo", api_key=openai_api_key, model_kwargs={"max_tokens": 2048})
         prompt_node = PromptNode(prompt_open_ai, default_prompt_template=lfqa_prompt)
     else:
-        prompt_node = PromptNode(model_name_or_path=model_name, use_gpu=False ,default_prompt_template=lfqa_prompt, model_kwargs={"model_max_length" : 1024})
+        retriever = BM25Retriever(document_store=document_store, top_k=2)
+        prompt_node = PromptNode(model_name_or_path=model_name, default_prompt_template=lfqa_prompt, model_kwargs={"model_max_length" : 1512})
 
     pipeline = Pipeline()
     pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])

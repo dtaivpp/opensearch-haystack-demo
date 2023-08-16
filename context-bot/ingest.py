@@ -9,6 +9,7 @@ urllib3.disable_warnings()
 
 
 def read_json(basepath):
+    """Process already formatted JSON"""
     files = [join(basepath, f) for f in listdir(basepath) if isfile(join(basepath, f))]
     data = []
     for file in files:
@@ -19,6 +20,7 @@ def read_json(basepath):
 
 
 def format_doc(doc):
+    """Normalize doc to haystack format"""
     content = doc.pop('content')
     return {
       'content': content, 
@@ -26,7 +28,7 @@ def format_doc(doc):
     }
 
 
-def normalize_docs(document_list):
+def normalize_doc_list(document_list):
     return [ format_doc(doc) for doc in document_list]
 
 
@@ -44,22 +46,24 @@ def preprocessor_builder(split_length, split_overlap):
     )
 
 
-def write_docs(docs):
+def index_docs(docs):
+    """Push docs to docstore"""
     docstore = build_doc_store()
     docstore.write_documents(docs)
 
 
 def ingest_docs(split_length=250, split_overlap=30, basepath="data"):
+    """Read and normalize doc json before writing them to OpenSearch"""
     raw_docs = read_json(basepath)
-    normalized = normalize_docs(raw_docs)
+    normalized = normalize_doc_list(raw_docs)
     preprocessed = preprocess_data(
                         normalized, 
                         preprocessor_builder(
                             split_length, 
                             split_overlap))
     
-    write_docs(preprocessed)
+    index_docs(preprocessed)
 
 
 if __name__=="__main__":
-    ingest_docs(split_length=100, split_overlap=20)
+    ingest_docs(split_length=150, split_overlap=20)
