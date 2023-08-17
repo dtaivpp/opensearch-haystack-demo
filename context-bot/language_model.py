@@ -1,16 +1,12 @@
 import os
-from haystack.nodes import BM25Retriever
-from haystack import Pipeline
+from haystack.nodes import BM25Retriever, EmbeddingRetriever, JoinDocuments
 from haystack.nodes import PromptNode, PromptTemplate, PromptModel
+from haystack import Pipeline
 from util import build_doc_store
 from time import time
 from dotenv import load_dotenv
 
-load_dotenv()
-openai_api_key = os.getenv('OPEN_API_KEY')
-
-def query_model(query, model_name="google/flan-t5-large"):
-    lfqa_prompt = PromptTemplate(
+LFQA_PROMPT = PromptTemplate(
         """Synthesize a comprehensive answer from the following text for the given question. 
         Provide a clear and concise response that summarizes the 
         key points and information presented in the text. 
@@ -18,26 +14,105 @@ def query_model(query, model_name="google/flan-t5-large"):
         \n\n Related text: {join(documents)} \n\n Question: {query} \n\n Answer:""",
     )
 
-    document_store=build_doc_store()    
-    if model_name=="gpt-3.5-turbo":
-        retriever = BM25Retriever(document_store=document_store, top_k=5)
-        prompt_open_ai = PromptModel(model_name_or_path="gpt-3.5-turbo", api_key=openai_api_key, model_kwargs={"max_tokens": 2048})
-        prompt_node = PromptNode(prompt_open_ai, default_prompt_template=lfqa_prompt)
-    else:
-        retriever = BM25Retriever(document_store=document_store, top_k=2)
-        prompt_node = PromptNode(model_name_or_path=model_name, default_prompt_template=lfqa_prompt, model_kwargs={"model_max_length" : 1512})
 
+load_dotenv()
+openai_api_key = os.getenv('OPEN_API_KEY')
+
+config = {
+    "model_configs": {
+        "gpt-3.5-turbo": {
+            "pipeline":
+                PromptNode(
+                    PromptModel(model_name_or_path="gpt-3.5-turbo", 
+                                api_key=openai_api_key, 
+                                model_kwargs={"max_tokens": 2048}), 
+                    default_prompt_template=LFQA_PROMPT),
+            "params": 
+                {"top_k": 5}
+        },
+        "google/flan-t5-large": {
+            "pipeline":
+                PromptNode(model_name_or_path="google/flan-t5-large", 
+                           model_kwargs={"max_tokens": 1512}, 
+                           default_prompt_template=LFQA_PROMPT),
+            "params": 
+                {"top_k": 2}
+        }
+    },
+    "retreiver_configs":{
+        "bm25": [lambda document_store: BM25Retriever(document_store=document_store, top_k=5)],
+        "vector": [lambda document_store: EmbeddingRetriever(document_store=document_store, top_k=5)],
+        "all": [lambda document_store: BM25Retriever(document_store=document_store, top_k=5),
+                lambda document_store: EmbeddingRetriever(document_store=document_store, top_k=5)]
+    }
+}
+
+
+def pipeline_run(query, model_name="google/flan-t5-large", retreiver_type="all"):
     pipeline = Pipeline()
-    pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    pipeline.add_node(component=prompt_node, name="Prompt", inputs=["Retriever"])
+    document_store = build_doc_store()
+    retreiver_list = config["retreiver_configs"][retreiver_type]
+    model = config["model_configs"][model_name]
 
-    output = pipeline.run(query=query)
+    join_documents = JoinDocuments(
+        join_mode="reciprocal_rank_fusion",
+        top_k_join=model["params"]["top_k"]
+    )
 
-    return output['results'][0]
+    # Add retriever/s to pipeline
+    for index, retreiver in enumerate(retreiver_list):
+        doc_store = retreiver(document_store)
+        pipeline.add_node(component=doc_store, name=index, inputs=["Query"])
+
+    # Run join to combine retrieved documents
+    pipeline.add_node(component=join_documents, name="JoinDocuments",
+              inputs=range(len(retreiver_list)-1))
+    
+    # Add the model
+    #pipeline.add_node(component=model["pipeline"], name="Prompt", inputs=["JoinDocuments"])
+    pn = PromptNode(model_name_or_path="google/flan-t5-large", 
+                           model_kwargs={"max_tokens": 1512}, 
+                           default_prompt_template=LFQA_PROMPT)
+    pipeline.add_node(component=pn, name="Prompt", inputs=["JoinDocuments"])
+    results = pipeline.run(query=query)
+    
+    # Run and return results
+    return results["answers"][0].answer
+
+def test_pipeline_run(query, model_name="google/flan-t5-large", retreiver_type="all"):
+    pipeline = Pipeline()
+    document_store = build_doc_store()
+    retreiver_list = config["retreiver_configs"][retreiver_type]
+    model = config["model_configs"][model_name]
+
+    join_documents = JoinDocuments(
+        join_mode="reciprocal_rank_fusion",
+        top_k_join=model["params"]["top_k"]
+    )
+
+    # Add retriever/s to pipeline
+    for index, retreiver in enumerate(retreiver_list):
+        doc_store = retreiver(document_store)
+        pipeline.add_node(component=doc_store, name=index, inputs=["Query"])
+
+    # Run join to combine retrieved documents
+    pipeline.add_node(component=join_documents, name="JoinDocuments",
+              inputs=range(len(retreiver_list)-1))
+    
+    # Add the model
+    #pipeline.add_node(component=model["pipeline"], name="Prompt", inputs=["JoinDocuments"])
+    pn = PromptNode(model_name_or_path="google/flan-t5-large", 
+                           model_kwargs={"max_tokens": 1512}, 
+                           default_prompt_template=LFQA_PROMPT)
+    pipeline.add_node(component=pn, name="Prompt", inputs=["JoinDocuments"])
+    results = pipeline.run(query=query)
+    
+    # Run and return results
+    return results["answers"][0].answer
 
 if __name__=="__main__":
-    query = "How do I enable segment replication"
+    query = "What is SSFO and why should I use it"
     start = time()
-    print(f"\n\nResults: \n{query_model(query)}")
+    print(f"\n\nResults: \n{test_pipeline_run(query=query, retreiver_type='bm25')}")
     end = time()
     print(f"Time Taken: {end - start}")
