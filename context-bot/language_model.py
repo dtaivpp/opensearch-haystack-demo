@@ -33,7 +33,7 @@ config = {
         "google/flan-t5-large": {
             "pipeline":
                 PromptNode(model_name_or_path="google/flan-t5-large", 
-                           model_kwargs={"max_tokens": 1512}, 
+                           model_kwargs={"model_max_length" : 1512}, 
                            default_prompt_template=LFQA_PROMPT),
             "params": 
                 {"top_k": 2}
@@ -60,59 +60,25 @@ def pipeline_run(query, model_name="google/flan-t5-large", retreiver_type="all")
     )
 
     # Add retriever/s to pipeline
+    index_names = []
     for index, retreiver in enumerate(retreiver_list):
         doc_store = retreiver(document_store)
-        pipeline.add_node(component=doc_store, name=index, inputs=["Query"])
+        pipeline.add_node(component=doc_store, name=str(index), inputs=["Query"])
+        index_names.append(str(index))
 
     # Run join to combine retrieved documents
     pipeline.add_node(component=join_documents, name="JoinDocuments",
-              inputs=range(len(retreiver_list)-1))
-    
-    # Add the model
-    #pipeline.add_node(component=model["pipeline"], name="Prompt", inputs=["JoinDocuments"])
-    pn = PromptNode(model_name_or_path="google/flan-t5-large", 
-                           model_kwargs={"max_tokens": 1512}, 
-                           default_prompt_template=LFQA_PROMPT)
-    pipeline.add_node(component=pn, name="Prompt", inputs=["JoinDocuments"])
+              inputs=index_names)
+
+    pipeline.add_node(component=model["pipeline"], name="Prompt", inputs=["JoinDocuments"])
     results = pipeline.run(query=query)
     
     # Run and return results
-    return results["answers"][0].answer
-
-def test_pipeline_run(query, model_name="google/flan-t5-large", retreiver_type="all"):
-    pipeline = Pipeline()
-    document_store = build_doc_store()
-    retreiver_list = config["retreiver_configs"][retreiver_type]
-    model = config["model_configs"][model_name]
-
-    join_documents = JoinDocuments(
-        join_mode="reciprocal_rank_fusion",
-        top_k_join=model["params"]["top_k"]
-    )
-
-    # Add retriever/s to pipeline
-    for index, retreiver in enumerate(retreiver_list):
-        doc_store = retreiver(document_store)
-        pipeline.add_node(component=doc_store, name=index, inputs=["Query"])
-
-    # Run join to combine retrieved documents
-    pipeline.add_node(component=join_documents, name="JoinDocuments",
-              inputs=range(len(retreiver_list)-1))
-    
-    # Add the model
-    #pipeline.add_node(component=model["pipeline"], name="Prompt", inputs=["JoinDocuments"])
-    pn = PromptNode(model_name_or_path="google/flan-t5-large", 
-                           model_kwargs={"max_tokens": 1512}, 
-                           default_prompt_template=LFQA_PROMPT)
-    pipeline.add_node(component=pn, name="Prompt", inputs=["JoinDocuments"])
-    results = pipeline.run(query=query)
-    
-    # Run and return results
-    return results["answers"][0].answer
+    return results["results"][0]
 
 if __name__=="__main__":
     query = "What is SSFO and why should I use it"
     start = time()
-    print(f"\n\nResults: \n{test_pipeline_run(query=query, retreiver_type='bm25')}")
+    print(f"\n\nResults: \n{pipeline_run(query=query, retreiver_type='bm25')}")
     end = time()
     print(f"Time Taken: {end - start}")
